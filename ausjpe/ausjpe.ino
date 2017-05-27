@@ -3,7 +3,13 @@
 #define ledRed 13
 #define ledGreen 12
 #define beepPin 9
-#define ultrasonicPin 7
+
+#define ultrasonicTriggerPin 6
+#define ultrasonicEchoPin 7
+
+// set useHC_SR04 to 0 and useUltrasonicRanger to 1 if you have the Ultrasonic Ranger sensor.
+#define useHC_SR04 1
+#define useUltrasonicRanger 0
 
 String inputString = "";         // a string to hold incoming data
 boolean stringComplete = false;  // whether the string is complete
@@ -32,54 +38,73 @@ void loop() {
     JsonObject& root = jsonBuffer.parseObject(inputString);
     bool led = root["led"];
     bool beepV = root["beep"];
-    if(led){
+    if (led) {
       digitalWrite(LED_BUILTIN, HIGH);
       digitalWrite(ledRed, HIGH);
       digitalWrite(ledGreen, LOW);
     }
-    if(beepV){
+    if (beepV) {
       beep(200);
     }
     // Serial.println(beepV);
-    // Serial.println(inputString); 
+    // Serial.println(inputString);
     // clear the string:
     inputString = "";
     stringComplete = false;
-  }else{
-      digitalWrite(LED_BUILTIN, LOW);
-      digitalWrite(ledRed, LOW);
-      digitalWrite(ledGreen, HIGH);
-    }
-    ping();
+  } else {
+    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(ledRed, LOW);
+    digitalWrite(ledGreen, HIGH);
+  }
+  if (useUltrasonicRanger) {
+    int duration = pingUltrasonicRanger();
+    int cm = microsecondsToCentimeters(duration);
+    sendRange(cm);
+  }
+  if (useHC_SR04) {
+    int duration = pingHCSR04();
+    int cm = microsecondsToCentimeters(duration);
+    sendRange(cm);
+  }
+
+}
+
+// source: http://www.mikrocontroller-elektronik.de/ultraschallsensor-hc-sr04/
+int pingHCSR04() {
+  long mtime = 0;
+  pinMode(ultrasonicTriggerPin, OUTPUT);
+  pinMode(ultrasonicEchoPin, INPUT);
+  digitalWrite(ultrasonicTriggerPin, LOW);
+  delayMicroseconds(3);
+  noInterrupts();
+  digitalWrite(ultrasonicTriggerPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ultrasonicTriggerPin, LOW);
+  mtime = pulseIn(ultrasonicEchoPin, HIGH);
+  interrupts();
+  return mtime;
 }
 
 // source: https://www.arduino.cc/en/Tutorial/Ping
-void ping(){
+int pingUltrasonicRanger() {
   long duration, inches, cm;
 
   // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
   // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-  pinMode(ultrasonicPin, OUTPUT);
-  digitalWrite(ultrasonicPin, LOW);
+  pinMode(ultrasonicEchoPin, OUTPUT);
+  digitalWrite(ultrasonicEchoPin, LOW);
   delayMicroseconds(2);
-  digitalWrite(ultrasonicPin, HIGH);
+  digitalWrite(ultrasonicEchoPin, HIGH);
   delayMicroseconds(5);
-  digitalWrite(ultrasonicPin, LOW);
+  digitalWrite(ultrasonicEchoPin, LOW);
 
   // The same pin is used to read the signal from the PING))): a HIGH
   // pulse whose duration is the time (in microseconds) from the sending
   // of the ping to the reception of its echo off of an object.
-  pinMode(ultrasonicPin, INPUT);
-  duration = pulseIn(ultrasonicPin, HIGH);
+  pinMode(ultrasonicEchoPin, INPUT);
+  duration = pulseIn(ultrasonicEchoPin, HIGH);
+  return duration;
 
-  // convert the time into a distance
-  cm = microsecondsToCentimeters(duration);
-  Serial.print("{\"range\":");
-  Serial.print(cm);
-  Serial.print(", \"unit\":\"cm\"}");
-  Serial.println();
-
-  delay(100);
 }
 
 long microsecondsToCentimeters(long microseconds) {
@@ -89,32 +114,42 @@ long microsecondsToCentimeters(long microseconds) {
   return microseconds / 29 / 2;
 }
 
+void sendRange(int range_cm) {
+
+  Serial.print("{\"range\":");
+  Serial.print(range_cm);
+  Serial.print(", \"unit\":\"cm\"}");
+  Serial.println();
+
+  delay(100);
+}
+
 // source: http://www.hobbytronics.co.uk/arduino-tutorial7-piezo-beep
-void beep(unsigned char delayms){
+void beep(unsigned char delayms) {
   analogWrite(beepPin, 20);      // Almost any value can be used except 0 and 255
-                           // experiment to get the best tone
+  // experiment to get the best tone
   delay(delayms);          // wait for a delayms ms
   analogWrite(beepPin, 0);       // 0 turns it off
-  delay(delayms);          // wait for a delayms ms   
+  delay(delayms);          // wait for a delayms ms
 }
 
 /*
   SerialEvent occurs whenever a new data comes in the
- hardware serial RX.  This routine is run between each
- time loop() runs, so using delay inside loop can delay
- response.  Multiple bytes of data may be available.
- */
+  hardware serial RX.  This routine is run between each
+  time loop() runs, so using delay inside loop can delay
+  response.  Multiple bytes of data may be available.
+*/
 void serialEvent() {
   while (Serial.available() && !stringComplete) {
     // get the new byte:
-    char inChar = (char)Serial.read(); 
+    char inChar = (char)Serial.read();
     // add it to the inputString:
     inputString += inChar;
     // if the incoming character is a newline, set a flag
     // so the main loop can do something about it:
     if (inChar == '\n') {
       stringComplete = true;
-    } 
+    }
   }
 }
 
