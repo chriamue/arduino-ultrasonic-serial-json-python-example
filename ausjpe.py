@@ -22,3 +22,10 @@ while True:
     if readJson['range'] < 25:
         sendStr = json.dumps({'led': True, 'beep': True}, separators=(',',':'))
         ser.write(sendStr + "\n")
+    else:
+        try:
+		angle = int(readJson['range']) % 180
+		sendStr = json.dumps({'angle': angle}, separators=(',',':'))
+		ser.write(sendStr + "\n")
+        except:
+                pass

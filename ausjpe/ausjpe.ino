@@ -1,4 +1,5 @@
 #include <ArduinoJson.h>
+#include <Servo.h>
 
 #define ledRed 13
 #define ledGreen 12
@@ -7,13 +8,19 @@
 #define ultrasonicTriggerPin 6
 #define ultrasonicEchoPin 7
 
+#define servoPin 10
+
 // set useHC_SR04 to 0 and useUltrasonicRanger to 1 if you have the Ultrasonic Ranger sensor.
 #define useHC_SR04 1
 #define useUltrasonicRanger 0
+#define useServo 1
 
 String inputString = "";         // a string to hold incoming data
 boolean stringComplete = false;  // whether the string is complete
 
+int servoPos = 0;
+
+Servo servo;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -25,6 +32,8 @@ void setup() {
   pinMode(beepPin, OUTPUT);
   pinMode(ledRed, OUTPUT);
   pinMode(ledGreen, OUTPUT);
+
+  servo.attach(servoPin);
   //beep(50);
   //beep(50);
   //beep(50);
@@ -38,6 +47,7 @@ void loop() {
     JsonObject& root = jsonBuffer.parseObject(inputString);
     bool led = root["led"];
     bool beepV = root["beep"];
+    int angleV = root["angle"];
     if (led) {
       digitalWrite(LED_BUILTIN, HIGH);
       digitalWrite(ledRed, HIGH);
@@ -46,6 +56,10 @@ void loop() {
     if (beepV) {
       beep(200);
     }
+    if(angleV >= 0 && angleV <= 180){
+      servoPos = angleV;
+    }
+    
     // Serial.println(beepV);
     // Serial.println(inputString);
     // clear the string:
@@ -65,6 +79,10 @@ void loop() {
     int duration = pingHCSR04();
     int cm = microsecondsToCentimeters(duration);
     sendRange(cm);
+  }
+
+  if(useServo){
+    servo.write(servoPos); 
   }
 
 }
